@@ -334,6 +334,19 @@ body.touch .dmBtns .btn{min-height:36px}
 @media (prefers-reduced-motion:reduce){.dmHi{animation:none}}
 .job.demo{border-style:dashed;border-top-style:solid;background:linear-gradient(180deg,rgba(245,179,1,.10),var(--panel2) 60%)}
 .job.demo b{color:var(--amber)}
+.job.cur{box-shadow:inset 0 0 0 1px var(--c)}
+#form{position:relative}
+.fbusy{position:absolute;inset:-8px;z-index:6;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(8,13,26,.82);border-radius:12px;backdrop-filter:blur(2px)}
+.fbusy[hidden]{display:none}
+body.fport .fbusy{position:fixed;inset:0;border-radius:0}
+.fbusybox{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;max-width:320px;padding:20px 24px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.fbusybox b{font-size:16px}
+.fbusybox span{font-size:13.5px;color:var(--ink)}
+.fbusybox small{font-size:12px;color:var(--muted)}
+.spin{display:inline-block;width:38px;height:38px;border:4px solid rgba(255,255,255,.18);border-top-color:#4c9aff;border-radius:50%;animation:spin .85s linear infinite}
+.btn.busy{position:relative;padding-left:40px;cursor:progress;opacity:1}
+.btn.busy::before{content:"";position:absolute;left:14px;top:50%;width:16px;height:16px;margin-top:-10px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .85s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .scs{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .job.rnd{border-style:dashed;border-top-style:solid;background:linear-gradient(180deg,rgba(76,154,255,.10),var(--panel2) 60%)}
 .job .scn{font-style:normal;font-size:11px;font-weight:700;color:var(--c);letter-spacing:.02em}
@@ -426,7 +439,7 @@ body.touch .dmBtns .btn{min-height:36px}
         <hr>
         <small>다시 하기 · 나가기</small>
         <button class="btn" id="mx_again" type="button">처음부터 다시</button>
-        <button class="btn" id="mx_other" type="button">다른 상황으로</button>
+        <button class="btn" id="mx_other" type="button">다른 상황 고르기</button>
         <button class="btn" id="mx_job" type="button">직무 다시 선택</button>
         <button class="btn" id="mx_home" type="button">시작 화면으로</button>
       </div>
@@ -509,6 +522,9 @@ body.touch .dmBtns .btn{min-height:36px}
           </div>
         </div>
         <p class="say" id="fSay" role="status"></p>
+        <div class="fbusy" id="fBusy" hidden role="status" aria-live="polite">
+          <div class="fbusybox"><span class="spin" aria-hidden="true"></span><b>결과를 저장하고 있습니다</b><span id="fBusyT">잠시만 기다려 주십시오 · 0초</span><small>저장이 끝날 때까지 창을 닫지 마십시오.</small></div>
+        </div>
         <p class="fporthint">휴대폰을 세로로 돌리면 더 편하게 입력할 수 있습니다.</p>
         <p class="note fnote">제출하면 이름·소속 역·직급·직책·서명과 훈련 결과가 훈련 관리 목적으로 관리자의 구글 시트에 저장됩니다.</p>
       </form>
@@ -1409,7 +1425,7 @@ function showJobs(){
 // 상황 선택: 무작위 1장 + 상황별 카드. 선택 화면에는 역 이름을 쓰지 않는다(pickT·pickD)
 const scTitle=s=>s.pickT||s.t;
 const scDesc=s=>{if(s.pickD)return s.pickD;const b=s.brief||"";const k=b.indexOf(".");return k>0?b.slice(0,k+1):b;};
-function pickScenario(j){
+function pickScenario(j,cur){
   const box=$("scs");box.innerHTML="";box.style.setProperty("--c",j.c);
   $("jobs").hidden=true;box.hidden=false;$("pJobs").hidden=false;
   $("pEye").textContent=j.name+" · 상황 선택";$("pTitle").textContent="어떤 상황으로 훈련하시겠습니까?";
@@ -1418,7 +1434,7 @@ function pickScenario(j){
     b.innerHTML=(tag?"<i class='scn'></i>":"")+"<b></b><span></span><em></em>";const o=tag?1:0;if(tag)b.children[0].textContent=tag;
     b.children[o].textContent=title;b.children[o+1].textContent=desc;b.children[o+2].textContent=meta;b.onclick=go;box.appendChild(b);return b;};
   card("rnd","무작위 발령","어떤 상황이 나올지 모르는 실전 방식입니다. 직전에 한 상황은 빼고 고릅니다.","상황 "+j.sc.length+"종 중 하나",()=>startJob(j));
-  j.sc.forEach((s,i)=>card("",scTitle(s),scDesc(s),"조치 "+s.steps.length+"단계 · 골든타임 "+(s.gold||[]).length+"개",()=>startJob(j,s),"상황 "+(i+1)));
+  j.sc.forEach((s,i)=>card(s===cur?"cur":"",scTitle(s),scDesc(s),"조치 "+s.steps.length+"단계 · 골든타임 "+(s.gold||[]).length+"개",()=>startJob(j,s),"상황 "+(i+1)+(s===cur?" · 방금 하던 상황":"")));
   setTimeout(()=>{try{box.firstElementChild.focus();}catch(e){}},0);
 }
 function begin(){audioOn();lockLandscape();G.mode="pick";show("pick");}
@@ -1574,7 +1590,7 @@ function finish(){
   G.marks=G.sc.gold.map(g=>{const r=G.rev[g[0]],sec=r?r.sec:null;return {label:g[1],goal:g[2],sec,ok:sec!=null&&sec<=g[2],step:g[0]};});
   const gd=$("rGold");gd.innerHTML="";G.marks.forEach(m=>{const row=el("div","grow");row.append(el("b","",m.label),el("span","mono","목표 "+fmt(m.goal)+" 이내"),el("span","mono",m.sec==null?"-":fmt(m.sec)),el("i","pill "+(m.ok?"ok":"no"),m.ok?"✓ 달성":"✕ 초과"));gd.appendChild(row);});
   G.localSaved=false;$("rTrendBox").hidden=true;myRuns().then(r=>showTrend(r,false));
-  $("fSend").disabled=false;$("fSay").textContent="";$("fCopy").hidden=true;$("fPre").hidden=false;$("fPost").hidden=true;sigClear();show("done");showResults();
+  G.sending=false;G.submitted=false;sendBusy(false);$("fSend").disabled=false;$("fSay").textContent="";$("fCopy").hidden=true;$("fPre").hidden=false;$("fPost").hidden=true;sigClear();show("done");showResults();
 }
 /* ===================== 결과 제출·관리자 ===================== */
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
@@ -1641,24 +1657,35 @@ function sigClear(){const c=$("sig"),g=c.getContext("2d");g.fillStyle="#fff";g.f
   const up=()=>{SIG.down=false;};c.addEventListener("pointerup",up);c.addEventListener("pointercancel",up);})();
 function runText(r){return "[코레일 비상대응 훈련 결과]\n이름: "+r.name+"\n소속 역: "+r.station+"\n직급: "+r.rank+"\n직책: "+r.role+"\n직무: "+r.job+"\n상황: "+r.scenario+"\n일시: "+new Date(r.at).toLocaleString("ko-KR")+
   "\n소요 시간: "+fmt(r.sec)+"\n점수: "+r.score+" ("+r.grade+")\n오판: "+r.miss+"회\n골든타임: "+goldHit(r)+"\n"+r.marks.map(m=>"- "+m.label+" "+(m.sec==null?"-":fmt(m.sec))+" / 목표 "+fmt(m.goal)+(m.ok?" 달성":" 초과")).join("\n")+"\n"+r.steps.map((s,i)=>(i+1)+". "+(s.ok?"○ ":"△ ")+s.t).join("\n");}
+// 제출 중 표시: 단추에 회전 표시·'저장 중', 입력 칸 위에 안내 창과 경과 초. 저장 중에는 다른 단추도 막는다
+let busyT=0;
+function sendBusy(on){
+  const b=$("fSend");b.disabled=!!on||!!G.submitted;b.classList.toggle("busy",!!on);b.textContent=on?"저장 중…":"결과 제출";
+  ["fBack","fCopy","sigClr"].forEach(id=>{const x=$(id);if(x)x.disabled=!!on;});
+  const o=$("fBusy");if(o)o.hidden=!on;clearInterval(busyT);
+  if(on){const t0=Date.now(),t=$("fBusyT");const up=()=>{const s=Math.floor((Date.now()-t0)/1000);t.textContent=s<8?"잠시만 기다려 주십시오 · "+s+"초":"인터넷 상태에 따라 25초까지 걸릴 수 있습니다 · "+s+"초";};up();busyT=setInterval(up,1000);}
+}
 async function submit(e){
   e.preventDefault();const v=id=>$(id).value.trim(),say=t=>{$("fSay").textContent=t;};
+  if(G.sending||G.submitted)return;   // 한 번만: 저장 중이거나 이미 제출했으면 무시
   if(G.demo){say("시연에서는 제출하지 않습니다. 직무를 골라 실제 훈련을 마친 뒤 제출하십시오.");return;}
   const name=v("fName"),station=v("fStation"),rank=getPick("Rank"),role=getPick("Role");
   const miss=formMissing();if(miss){say(miss[1]+"을(를) 입력하십시오. 이름, 소속 역, 직급, 직책이 모두 필요합니다.");if(!G.touch)$(miss[0]).focus();return;}
   if(!SIG.dirty){say("서명란에 서명하십시오.");return;}
   if($("fMem").checked)saveMe({name,station,rank,role});else clearMe();
   const run={name,station,rank,role,sig:$("sig").toDataURL("image/png"),score:Math.round(G.score),grade:G.grade,miss:G.miss,sec:Math.round(G.el),at:new Date().toISOString(),job:G.job.name,jobId:G.job.id,scId:G.sc.id,scenario:G.sc.t,place:G.sc.loc,steps:G.rev.map(r=>({t:r.short,ok:r.ok,sec:r.sec,act:r.t})),marks:G.marks};
-  G.lastRun=run;$("fSend").disabled=true;say("저장하는 중입니다.");
-  if(!CONFIG.SHEET_URL){say("결과를 보낼 구글 시트 주소가 아직 설정되지 않았습니다. '결과 복사' 단추로 결과를 복사해 관리자에게 보내십시오.");$("fCopy").hidden=false;$("fSend").disabled=false;return;}
+  G.lastRun=run;
+  if(!CONFIG.SHEET_URL){say("결과를 보낼 구글 시트 주소가 아직 설정되지 않았습니다. '결과 복사' 단추로 결과를 복사해 관리자에게 보내십시오.");$("fCopy").hidden=false;return;}
+  G.sending=true;sendBusy(true);say("저장하는 중입니다.");
   try{
     const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),25000);
     // 본문을 일반 글자로 보내면 구글 쪽에서 별도 사전 확인 없이 받는다
     const res=await fetch(CONFIG.SHEET_URL,{method:"POST",body:JSON.stringify({key:CONFIG.SUBMIT_KEY,run}),signal:ctl.signal});clearTimeout(tm);
     const j=await res.json();if(!j.ok)throw new Error(j.error||"fail");
     if(!G.localSaved){G.localSaved=true;G.hist=saveLocal(run);}
+    G.sending=false;G.submitted=true;sendBusy(false);
     say("제출했습니다. 관리자가 구글 시트에서 결과를 확인할 수 있습니다.");showTrend(G.hist,true);$("fCopy").hidden=true;$("fPre").hidden=true;$("fPost").hidden=false;
-  }catch(err){say(String(err&&err.message)==="key"?"앱과 구글 시트의 제출 키가 서로 다릅니다. 관리자에게 알려 주십시오.":"결과를 보내지 못했습니다. 인터넷 연결을 확인하고 다시 누르거나, '결과 복사' 단추로 결과를 복사해 관리자에게 보내십시오.");$("fCopy").hidden=false;$("fSend").disabled=false;}
+  }catch(err){say(String(err&&err.message)==="key"?"앱과 구글 시트의 제출 키가 서로 다릅니다. 관리자에게 알려 주십시오.":"결과를 보내지 못했습니다. 인터넷 연결을 확인하고 다시 누르거나, '결과 복사' 단추로 결과를 복사해 관리자에게 보내십시오.");G.sending=false;sendBusy(false);$("fCopy").hidden=false;}
 }
 // 관리자 결과 보기: 비밀번호 없이 바로 불러온다. fromDone=제출을 마친 훈련 결과 화면에서 들어왔는지
 function loadAdmin(fromDone){
@@ -1809,7 +1836,7 @@ function closeMenu(){
 /* ---- 나가기: 한 번 더 묻고 나간다 ---- */
 const EXITS={
   again:{t:"처음부터 다시",q:"같은 상황을 처음부터 다시 시작합니다(인트로는 건너뜁니다)."},
-  other:{t:"다른 상황으로",q:"같은 직무의 다른 상황으로 바꿉니다."},
+  other:{t:"다른 상황 고르기",q:"지금 훈련을 끝내고, 같은 직무의 상황 목록에서 다른 상황을 고릅니다."},
   job:{t:"직무 다시 선택",q:"직무 선택 화면으로 돌아갑니다."},
   home:{t:"시작 화면으로",q:"처음 시작 화면으로 돌아갑니다."}
 };
@@ -1833,7 +1860,7 @@ function doExit(){
   if(G.demo){leaveRun();if(k==="again"||k==="other"){endDemo(false);startDemo();}else{endDemo(false);G.mode=k==="job"?"pick":"start";show(G.mode);}return;}
   if(k==="again"){restartRun();return;}
   leaveRun();
-  if(k==="other")startJob(G.job);
+  if(k==="other"){G.mode="pick";show("pick");pickScenario(G.job,G.sc);}
   else if(k==="job"){G.mode="pick";show("pick");}
   else{G.mode="start";show("start");}
 }
